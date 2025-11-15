@@ -8,6 +8,9 @@ const FREEPIK_API_URL = 'https://api.freepik.com/v1/ai/text-to-image/seedream-v4
 
 export const sendLearningRequest = async (query) => {
   try {
+    console.log('[Frontend] Sending request to backend:', query);
+    console.log('[Frontend] Backend URL:', API_ENDPOINT);
+    
     // Make POST request to backend proxy (which forwards to Airia)
     const response = await axios.post(API_ENDPOINT, {
       userInput: query
@@ -17,10 +20,23 @@ export const sendLearningRequest = async (query) => {
       }
     });
 
+    console.log('[Frontend] Response received:', {
+      status: response.status,
+      hasData: !!response.data,
+      dataKeys: response.data ? Object.keys(response.data) : [],
+      requestId: response.data?.requestId,
+      duration: response.data?.duration
+    });
+
     // Return the response data
     return response;
   } catch (error) {
-    console.error('API Error:', error);
+    console.error('[Frontend] API Error:', error.message);
+    console.error('[Frontend] Error details:', {
+      status: error.response?.status,
+      data: error.response?.data,
+      message: error.message
+    });
     throw error;  // Throw error instead of using mock data
   }
 };

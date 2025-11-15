@@ -36,10 +36,14 @@ const ChatInterface = ({ messages, setMessages }) => {
     try {
       const response = await sendLearningRequest(inputValue);
       
+      // Backend returns { data: { topic, chapters, quiz }, requestId, duration }
+      // Extract the actual content from response.data.data
+      const contentData = response.data?.data || response.data;
+      
       const botMessage = {
         id: Date.now() + 1,
         type: 'bot',
-        content: response.data,
+        content: contentData,
         timestamp: new Date()
       };
 
@@ -47,12 +51,26 @@ const ChatInterface = ({ messages, setMessages }) => {
     } catch (error) {
       console.error('Error sending request:', error);
       
+      // Extract error details from backend response
+      const errorData = error.response?.data;
+      let errorText = 'I apologize, but I encountered an error while processing your request. Please try again.';
+      
+      if (errorData) {
+        if (errorData.message) {
+          errorText = errorData.message;
+        }
+        if (errorData.troubleshooting && Array.isArray(errorData.troubleshooting)) {
+          errorText += '\n\nTroubleshooting:\n' + errorData.troubleshooting.map(tip => `• ${tip}`).join('\n');
+        }
+      }
+      
       const errorMessage = {
         id: Date.now() + 1,
         type: 'bot',
         content: {
           error: true,
-          message: 'I apologize, but I encountered an error while processing your request. Please try again.'
+          message: errorText,
+          details: errorData
         },
         timestamp: new Date()
       };
