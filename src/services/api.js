@@ -6,18 +6,62 @@ const API_ENDPOINT = `${BACKEND_URL}/api/learn`;
 const FREEPIK_API_KEY = process.env.REACT_APP_FREEPIK_API_KEY;
 const FREEPIK_API_URL = 'https://api.freepik.com/v1/ai/text-to-image/seedream-v4';
 
-export const sendLearningRequest = async (query) => {
+// Send quiz feedback to Airia
+export const sendQuizFeedback = async (title, responses) => {
+  try {
+    console.log('[Frontend] Sending quiz feedback...');
+    console.log('[Frontend] Title:', title);
+    console.log('[Frontend] Responses:', responses.length);
+    
+    const response = await axios.post(`${BACKEND_URL}/api/quiz-feedback`, {
+      title,
+      responses
+    }, {
+      headers: {
+        'Content-Type': 'application/json'
+      },
+      timeout: 30000 // 30 seconds
+    });
+    
+    console.log('[Frontend] Quiz feedback sent successfully');
+    return response;
+  } catch (error) {
+    console.error('[Frontend] Quiz feedback error:', error.message);
+    throw error;
+  }
+};
+
+export const sendLearningRequest = async (query, quizSummary = null) => {
   try {
     console.log('[Frontend] Sending request to backend:', query);
     console.log('[Frontend] Backend URL:', API_ENDPOINT);
     
-    // Make POST request to backend proxy (which forwards to Airia)
-    const response = await axios.post(API_ENDPOINT, {
+    // Prepare request payload
+    const payload = {
       userInput: query
-    }, {
+    };
+    
+    // Add quiz summary if provided
+    if (quizSummary) {
+      console.log('[Frontend] Including quiz results:', quizSummary);
+      payload.quizResults = {
+        score: quizSummary.score,
+        totalQuestions: quizSummary.totalQuestions,
+        passedQuestions: quizSummary.passed.map(q => q.question),
+        failedQuestions: quizSummary.failed.map(q => ({
+          question: q.question,
+          userAnswer: q.userAnswer,
+          correctAnswer: q.correctAnswer
+        }))
+      };
+    }
+    
+    // Make POST request to backend proxy (which forwards to Airia)
+    const response = await axios.post(API_ENDPOINT, payload, {
       headers: {
         'Content-Type': 'application/json'
-      }
+      },
+      timeout: 300000 // 5 minutes for initial request
     });
 
     console.log('[Frontend] Response received:', {
@@ -28,15 +72,30 @@ export const sendLearningRequest = async (query) => {
       duration: response.data?.duration
     });
 
-    // Return the response data
+    // Return the response
     return response;
   } catch (error) {
     console.error('[Frontend] API Error:', error.message);
     console.error('[Frontend] Error details:', {
       status: error.response?.status,
       data: error.response?.data,
-      message: error.message
+      message: error.message,
+      code: error.code
     });
+    
+    // Handle specific error cases
+    if (error.code === 'ECONNABORTED') {
+      const timeoutError = new Error('Request timeout - The AI is taking too long to respond. Please try a simpler question or try again later.');
+      timeoutError.response = { status: 408, data: { message: timeoutError.message } };
+      throw timeoutError;
+    }
+    
+    if (error.response?.status === 524) {
+      const cloudflareError = new Error('Server timeout (524) - This usually means:\n1. The AI response is taking too long (>100 seconds)\n2. Your backend might be behind Cloudflare\n3. Try: Bypass Cloudflare for your API endpoint or upgrade your plan');
+      cloudflareError.response = { status: 524, data: { message: cloudflareError.message } };
+      throw cloudflareError;
+    }
+    
     throw error;  // Throw error instead of using mock data
   }
 };

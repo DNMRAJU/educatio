@@ -13,7 +13,7 @@ app.use(express.json());
 // Airia configuration
 const AIRIA_API_URL = process.env.AIRIA_API_URL || 'https://api.airia.ai/v2/PipelineExecution/252ecfc2-689f-484b-877c-9a6211cda1ba';
 const AIRIA_API_KEY = process.env.AIRIA_API_KEY || process.env.REACT_APP_API_TOKEN || 'ak-NjcxNTg4NDY3fDE3NjMyNDU2NjY4MDh8dGktYzJWeWRtbGpaVzV2ZHkxUGNHVnlJRkpsWjJsemRISmhkR2x2YmkxUWNtOW1aWE56YVc5dVlXdz18MXwyNzQyOTU0MTE1';
-const REQUEST_TIMEOUT = parseInt(process.env.REQUEST_TIMEOUT || '420000', 10); // 7 minutes default
+const REQUEST_TIMEOUT = parseInt(process.env.REQUEST_TIMEOUT || '300000', 10); // 5 minutes default
 
 console.log('[Backend] Configuration:');
 console.log('  - Airia API URL:', AIRIA_API_URL);
@@ -93,6 +93,38 @@ app.get('/api/test-connection', async (req, res) => {
   }
 });
 
+// Poll for async result
+app.get('/api/poll/:executionId', async (req, res) => {
+  const { executionId } = req.params;
+  const pollUrl = `https://api.airia.ai/v2/PipelineExecution/${executionId}`;
+  
+  try {
+    console.log(`[Poll] Checking status for execution: ${executionId}`);
+    
+    const response = await axios.get(pollUrl, {
+      headers: {
+        'X-API-KEY': AIRIA_API_KEY,
+        'Accept': 'application/json'
+      },
+      timeout: 30000
+    });
+    
+    console.log(`[Poll] Status: ${response.data.status}`);
+    
+    res.json({
+      status: response.data.status,
+      result: response.data.result,
+      data: response.data
+    });
+  } catch (error) {
+    console.error(`[Poll] Error:`, error.message);
+    res.status(500).json({
+      error: 'Failed to poll execution status',
+      message: error.message
+    });
+  }
+});
+
 // Proxy endpoint for Airia
 app.post('/api/learn', async (req, res) => {
   const requestId = Date.now().toString(36);
@@ -117,7 +149,7 @@ app.post('/api/learn', async (req, res) => {
 
     const payload = {
       userInput: userInput,
-      asyncOutput: false
+      asyncOutput: false // Airia returns full SSE stream immediately
     };
     
     console.log(`[${requestId}] Request payload:`, JSON.stringify(payload, null, 2));
@@ -141,7 +173,7 @@ app.post('/api/learn', async (req, res) => {
     const duration = Date.now() - startTime;
     console.log(`[${requestId}] ✅ Response received in ${duration}ms`);
     console.log(`[${requestId}] Status: ${response.status}`);
-    console.log(`[${requestId}] Headers:`, JSON.stringify(response.headers, null, 2));
+    console.log(`[${requestId}] Response data:`, JSON.stringify(response.data, null, 2));
     
     // Check if response was successful
     if (response.status >= 400) {
@@ -157,29 +189,26 @@ app.post('/api/learn', async (req, res) => {
       });
     }
 
-    // Parse the response - Airia returns result as a string
-    let parsedData = response.data;
+    // Airia returns the result in response.data.result as a JSON string
+    let finalResult = null;
     
-    // If result is a string, parse it
     if (response.data.result && typeof response.data.result === 'string') {
-      console.log(`[${requestId}] Parsing result string from Airia...`);
+      console.log(`[${requestId}] Parsing result JSON string from Airia...`);
       try {
-        parsedData = JSON.parse(response.data.result);
-        console.log(`[${requestId}] Successfully parsed result string`);
+        finalResult = JSON.parse(response.data.result);
+        console.log(`[${requestId}] Successfully parsed result`);
+        console.log(`[${requestId}] Result keys:`, Object.keys(finalResult));
       } catch (parseError) {
-        console.error(`[${requestId}] Failed to parse result string:`, parseError.message);
-        console.error(`[${requestId}] Raw result:`, response.data.result.substring(0, 500));
+        console.error(`[${requestId}] Failed to parse result JSON:`, parseError.message);
+        console.error(`[${requestId}] First 500 chars:`, response.data.result.substring(0, 500));
       }
     }
     
-    console.log(`[${requestId}] Parsed Data Type:`, typeof parsedData);
-    console.log(`[${requestId}] Parsed Data Keys:`, Object.keys(parsedData));
-    console.log(`[${requestId}] Full Response:`, JSON.stringify(parsedData, null, 2));
     console.log(`[${requestId}] ========== REQUEST COMPLETE (${duration}ms) ==========`);
 
     // Return the parsed data to frontend
     res.json({ 
-      data: parsedData,
+      data: finalResult || response.data,
       requestId,
       duration 
     });
@@ -277,6 +306,81 @@ app.post('/api/learn', async (req, res) => {
   }
 });
 
+// Quiz feedback endpoint
+app.post('/api/quiz-feedback', async (req, res) => {
+  const requestId = `feedback-${Date.now()}`;
+  const startTime = Date.now();
+  
+  try {
+    const { title, responses } = req.body;
+    
+    if (!responses || !Array.isArray(responses)) {
+      return res.status(400).json({
+        error: 'Invalid request',
+        message: 'responses array is required',
+        requestId
+      });
+    }
+    
+    console.log(`[${requestId}] ========== QUIZ FEEDBACK REQUEST ==========`);
+    console.log(`[${requestId}] Title: ${title}`);
+    console.log(`[${requestId}] Total responses: ${responses.length}`);
+    
+    // Use the specific execution ID from the curl example
+    const FEEDBACK_EXECUTION_ID = 'a6d69c49-12f9-47e9-8dd4-ab86d7dd5794';
+    const feedbackUrl = `https://api.airia.ai/v2/PipelineExecution/${FEEDBACK_EXECUTION_ID}`;
+    
+    const payload = {
+      title: title || "Quiz Feedback",
+      responses: responses
+    };
+    
+    console.log(`[${requestId}] Sending feedback to Airia...`);
+    console.log(`[${requestId}] Payload:`, JSON.stringify(payload, null, 2));
+    
+    const response = await axios.post(
+      feedbackUrl,
+      payload,
+      {
+        headers: {
+          'X-API-KEY': AIRIA_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        timeout: REQUEST_TIMEOUT
+      }
+    );
+    
+    const duration = Date.now() - startTime;
+    console.log(`[${requestId}] ✅ Feedback sent successfully (${duration}ms)`);
+    console.log(`[${requestId}] Response status: ${response.status}`);
+    
+    // Return success
+    res.json({
+      success: true,
+      message: 'Quiz feedback submitted successfully',
+      requestId,
+      duration
+    });
+    
+  } catch (error) {
+    const duration = Date.now() - startTime;
+    console.error(`[${requestId}] ❌ ERROR after ${duration}ms`);
+    console.error(`[${requestId}] Error:`, error.message);
+    
+    if (error.response) {
+      console.error(`[${requestId}] Response status:`, error.response.status);
+      console.error(`[${requestId}] Response data:`, error.response.data);
+    }
+    
+    res.status(500).json({
+      error: 'Failed to submit quiz feedback',
+      message: error.message,
+      requestId,
+      duration
+    });
+  }
+});
+
 // Start server
 app.listen(PORT, () => {
   console.log('\n' + '='.repeat(60));
@@ -290,6 +394,7 @@ app.listen(PORT, () => {
   console.log('  - GET  /health              - Health check');
   console.log('  - GET  /api/test-connection - Test Airia connectivity');
   console.log('  - POST /api/learn           - Proxy to Airia');
+  console.log('  - POST /api/quiz-feedback   - Submit quiz feedback');
   console.log('\n💡 Test connection: curl http://localhost:' + PORT + '/api/test-connection');
   console.log('='.repeat(60) + '\n');
 });

@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { ChevronDown, ChevronRight, BookOpen, FileText, HelpCircle, BarChart3, Menu, X, Home, Book, Circle } from 'lucide-react';
+import { ChevronDown, ChevronRight, BookOpen, FileText, HelpCircle, BarChart3, Menu, X, Home, Book, Circle, AlertTriangle, CreditCard, Lock, Server } from 'lucide-react';
 import QuizComponent from './QuizComponent';
 import VisualizationComponent from './VisualizationComponent';
 import SceneDisplay from './SceneDisplay';
 import ReactMarkdown from 'react-markdown';
 
-const ContentDisplay = ({ content, onRetakeCourse, originalPrompt }) => {
+const ContentDisplay = ({ content, onRetakeCourse, originalPrompt, sessionId }) => {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [selectedSection, setSelectedSection] = useState({ type: 'overview' });
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -45,9 +45,64 @@ const ContentDisplay = ({ content, onRetakeCourse, originalPrompt }) => {
 
   // Handle error messages
   if (content?.error) {
+    const statusCode = content?.statusCode;
+    let icon = <AlertTriangle className="w-8 h-8 text-red-500" />;
+    let bgColor = 'bg-red-50';
+    let borderColor = 'border-red-200';
+    let textColor = 'text-red-800';
+    let titleColor = 'text-red-900';
+    
+    // Customize based on error type
+    if (statusCode === 402) {
+      icon = <CreditCard className="w-8 h-8 text-orange-500" />;
+      bgColor = 'bg-orange-50';
+      borderColor = 'border-orange-200';
+      textColor = 'text-orange-800';
+      titleColor = 'text-orange-900';
+    } else if (statusCode === 401 || statusCode === 403) {
+      icon = <Lock className="w-8 h-8 text-yellow-500" />;
+      bgColor = 'bg-yellow-50';
+      borderColor = 'border-yellow-200';
+      textColor = 'text-yellow-800';
+      titleColor = 'text-yellow-900';
+    } else if (statusCode >= 500) {
+      icon = <Server className="w-8 h-8 text-purple-500" />;
+      bgColor = 'bg-purple-50';
+      borderColor = 'border-purple-200';
+      textColor = 'text-purple-800';
+      titleColor = 'text-purple-900';
+    }
+    
     return (
-      <div className="px-4 py-3">
-        <p className="text-red-600">{content.message}</p>
+      <div className="max-w-2xl mx-auto mt-12 px-4">
+        <div className={`${bgColor} border ${borderColor} rounded-xl p-8 shadow-sm`}>
+          <div className="flex items-start space-x-4">
+            <div className="flex-shrink-0">
+              {icon}
+            </div>
+            <div className="flex-1">
+              <h3 className={`text-lg font-bold ${titleColor} mb-3`}>
+                {statusCode === 402 ? 'Insufficient Credits' :
+                 statusCode === 401 || statusCode === 403 ? 'Authentication Error' :
+                 statusCode >= 500 ? 'Server Error' :
+                 'Error Occurred'}
+              </h3>
+              <div className={`${textColor} whitespace-pre-wrap leading-relaxed`}>
+                <ReactMarkdown>{content.message}</ReactMarkdown>
+              </div>
+              {content.details && (
+                <details className="mt-4">
+                  <summary className={`cursor-pointer text-sm font-semibold ${textColor} hover:underline`}>
+                    Technical Details
+                  </summary>
+                  <pre className={`mt-2 text-xs ${textColor} bg-white bg-opacity-50 p-3 rounded overflow-x-auto`}>
+                    {JSON.stringify(content.details, null, 2)}
+                  </pre>
+                </details>
+              )}
+            </div>
+          </div>
+        </div>
       </div>
     );
   }
@@ -241,6 +296,8 @@ const ContentDisplay = ({ content, onRetakeCourse, originalPrompt }) => {
                 quiz={content.quiz} 
                 onRetakeCourse={onRetakeCourse}
                 originalPrompt={originalPrompt}
+                sessionId={sessionId}
+                topic={content.topic || content.title || 'Quiz'}
               />
             </div>
           ) : currentContent?.isVisualization ? (
