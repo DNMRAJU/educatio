@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { CheckCircle, XCircle, AlertCircle } from 'lucide-react';
+import { CheckCircle, XCircle, AlertCircle, RefreshCw } from 'lucide-react';
 
-const QuizComponent = ({ quiz }) => {
+const QuizComponent = ({ quiz, onRetakeCourse }) => {
   const [answers, setAnswers] = useState({});
   const [showResults, setShowResults] = useState(false);
   const [score, setScore] = useState(0);
@@ -149,36 +149,64 @@ const QuizComponent = ({ quiz }) => {
       </div>
 
       {/* Quiz Actions */}
-      <div className="mt-6 flex items-center justify-between">
+      <div className="mt-6">
         {!showResults ? (
-          <button
-            onClick={handleSubmitQuiz}
-            disabled={Object.keys(answers).length !== questions.length}
-            className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-          >
-            Submit Quiz
-          </button>
-        ) : (
-          <div className="flex items-center space-x-4">
-            <div className="text-lg font-medium">
-              Score: <span className="text-purple-600">{score}/{questions.length}</span>
-              {score === questions.length && (
-                <span className="ml-2 text-green-600">Perfect! 🎉</span>
-              )}
-            </div>
+          <div className="flex items-center justify-between">
             <button
-              onClick={handleResetQuiz}
-              className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors"
+              onClick={handleSubmitQuiz}
+              disabled={Object.keys(answers).length !== questions.length}
+              className="px-6 py-2 bg-purple-500 text-white rounded-lg hover:bg-purple-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
             >
-              Try Again
+              Submit Quiz
             </button>
+            <span className="text-sm text-gray-500">
+              {Object.keys(answers).length}/{questions.length} answered
+            </span>
           </div>
-        )}
-        
-        {!showResults && (
-          <span className="text-sm text-gray-500">
-            {Object.keys(answers).length}/{questions.length} answered
-          </span>
+        ) : (
+          <div className="space-y-4">
+            {/* Score Display */}
+            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+              <div className="text-lg font-medium">
+                Score: <span className="text-purple-600">{score}/{questions.length}</span>
+                {score === questions.length ? (
+                  <span className="ml-2 text-green-600">Perfect! 🎉</span>
+                ) : (
+                  <span className="ml-2 text-orange-600">Keep learning! 📚</span>
+                )}
+              </div>
+              <button
+                onClick={handleResetQuiz}
+                className="px-4 py-2 bg-gray-500 text-white rounded-lg hover:bg-gray-600 transition-colors text-sm"
+              >
+                Retry Quiz
+              </button>
+            </div>
+
+            {/* Retake Course Option - Only show if score is not perfect */}
+            {score < questions.length && onRetakeCourse && (
+              <div className="p-4 bg-blue-50 border border-blue-200 rounded-lg">
+                <div className="flex items-start space-x-3">
+                  <AlertCircle className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
+                  <div className="flex-1">
+                    <p className="text-sm text-blue-800 font-medium mb-2">
+                      Want to review the material again?
+                    </p>
+                    <p className="text-xs text-blue-700 mb-3">
+                      We can generate a fresh learning experience to help you master this topic!
+                    </p>
+                    <button
+                      onClick={onRetakeCourse}
+                      className="flex items-center space-x-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors text-sm font-medium"
+                    >
+                      <RefreshCw className="w-4 h-4" />
+                      <span>Retake Course</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         )}
       </div>
     </div>

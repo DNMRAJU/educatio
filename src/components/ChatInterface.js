@@ -7,6 +7,7 @@ import { sendLearningRequest } from '../services/api';
 const ChatInterface = ({ messages, setMessages }) => {
   const [inputValue, setInputValue] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [isRetaking, setIsRetaking] = useState(false);
   const messagesEndRef = useRef(null);
   const inputRef = useRef(null);
 
@@ -18,23 +19,25 @@ const ChatInterface = ({ messages, setMessages }) => {
     scrollToBottom();
   }, [messages]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!inputValue.trim() || isLoading) return;
+  const handleSubmit = async (e, customPrompt = null) => {
+    e?.preventDefault();
+    const promptToUse = customPrompt || inputValue;
+    if (!promptToUse.trim() || isLoading) return;
 
     const userMessage = {
       id: Date.now(),
       type: 'user',
-      content: inputValue,
-      timestamp: new Date()
+      content: promptToUse,
+      timestamp: new Date(),
+      originalPrompt: promptToUse // Store original prompt for retakes
     };
 
     setMessages(prev => [...prev, userMessage]);
-    setInputValue('');
+    if (!customPrompt) setInputValue('');
     setIsLoading(true);
 
     try {
-      const response = await sendLearningRequest(inputValue);
+      const response = await sendLearningRequest(promptToUse);
       
       // Backend returns { data: { topic, chapters, quiz }, requestId, duration }
       // Extract the actual content from response.data.data
@@ -44,10 +47,12 @@ const ChatInterface = ({ messages, setMessages }) => {
         id: Date.now() + 1,
         type: 'bot',
         content: contentData,
-        timestamp: new Date()
+        timestamp: new Date(),
+        originalPrompt: promptToUse // Store original prompt for retakes
       };
 
       setMessages(prev => [...prev, botMessage]);
+      setIsRetaking(false);
     } catch (error) {
       console.error('Error sending request:', error);
       
@@ -78,8 +83,16 @@ const ChatInterface = ({ messages, setMessages }) => {
       setMessages(prev => [...prev, errorMessage]);
     } finally {
       setIsLoading(false);
+      setIsRetaking(false);
       inputRef.current?.focus();
     }
+  };
+
+  const handleRetakeCourse = (originalPrompt) => {
+    setIsRetaking(true);
+    setIsLoading(true);
+    // Call handleSubmit with the original prompt
+    handleSubmit(null, originalPrompt);
   };
 
   return (
@@ -116,7 +129,11 @@ const ChatInterface = ({ messages, setMessages }) => {
                 </div>
               ) : (
                 <div className="w-full">
-                  <ContentDisplay content={message.content} />
+                  <ContentDisplay 
+                    content={message.content}
+                    onRetakeCourse={() => handleRetakeCourse(message.originalPrompt)}
+                    originalPrompt={message.originalPrompt}
+                  />
                 </div>
               )}
             </div>
@@ -131,7 +148,9 @@ const ChatInterface = ({ messages, setMessages }) => {
                 <div className="bg-white rounded-2xl shadow-sm px-4 py-3">
                   <div className="flex items-center space-x-2">
                     <Loader2 className="w-4 h-4 animate-spin text-primary-500" />
-                    <span className="text-gray-500">Generating learning content...</span>
+                    <span className="text-gray-500">
+                      {isRetaking ? 'Crafting a new learning experience...' : 'Generating learning content...'}
+                    </span>
                   </div>
                 </div>
               </div>

@@ -5,7 +5,7 @@ import VisualizationComponent from './VisualizationComponent';
 import SceneDisplay from './SceneDisplay';
 import ReactMarkdown from 'react-markdown';
 
-const ContentDisplay = ({ content }) => {
+const ContentDisplay = ({ content, onRetakeCourse, originalPrompt }) => {
   const [expandedChapters, setExpandedChapters] = useState({});
   const [selectedSection, setSelectedSection] = useState({ type: 'overview' });
   const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -237,7 +237,11 @@ const ContentDisplay = ({ content }) => {
               {content.quiz?.description && (
                 <p className="text-gray-600 mb-6">{content.quiz.description}</p>
               )}
-              <QuizComponent quiz={content.quiz} />
+              <QuizComponent 
+                quiz={content.quiz} 
+                onRetakeCourse={onRetakeCourse}
+                originalPrompt={originalPrompt}
+              />
             </div>
           ) : currentContent?.isVisualization ? (
             <div>
