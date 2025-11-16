@@ -7,33 +7,30 @@ const SceneDisplay = ({ scene, sceneIndex }) => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState(null);
 
-  useEffect(() => {
-    const loadImage = async () => {
-      // Check if scene has image or visual prompt
-      const prompt = scene.image_prompt || scene.visual_prompt;
-      
-      if (prompt) {
-        setIsLoading(true);
-        setError(null);
-        
-        try {
-          const url = await generateFreepikImage(prompt);
-          if (url) {
-            setImageUrl(url);
-          } else {
-            setError('Image generation failed');
-          }
-        } catch (err) {
-          console.error('Error generating image:', err);
-          setError('Failed to load image');
-        } finally {
-          setIsLoading(false);
-        }
-      }
-    };
-
-    loadImage();
-  }, [scene.image_prompt, scene.visual_prompt]);
+  // DISABLED: Image generation temporarily disabled
+  // useEffect(() => {
+  //   const loadImage = async () => {
+  //     const prompt = scene.image_prompt || scene.visual_prompt;
+  //     if (prompt) {
+  //       setIsLoading(true);
+  //       setError(null);
+  //       try {
+  //         const url = await generateFreepikImage(prompt);
+  //         if (url) {
+  //           setImageUrl(url);
+  //         } else {
+  //           setError('Image generation failed');
+  //         }
+  //       } catch (err) {
+  //         console.error('Error generating image:', err);
+  //         setError('Failed to load image');
+  //       } finally {
+  //         setIsLoading(false);
+  //       }
+  //     }
+  //   };
+  //   loadImage();
+  // }, [scene.image_prompt, scene.visual_prompt]);
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-6 mb-4">
@@ -62,8 +59,8 @@ const SceneDisplay = ({ scene, sceneIndex }) => {
         </div>
       )}
 
-      {/* Image Display */}
-      {(scene.image_prompt || scene.visual_prompt) && (
+      {/* DISABLED: Image Display - temporarily hidden */}
+      {/* {(scene.image_prompt || scene.visual_prompt) && (
         <div className="mt-4">
           {isLoading && (
             <div className="flex items-center justify-center p-8 bg-gray-50 rounded-lg">
@@ -100,7 +97,7 @@ const SceneDisplay = ({ scene, sceneIndex }) => {
             </div>
           )}
         </div>
-      )}
+      )} */}
 
       {/* Duration indicator */}
       {scene.duration_sec && (
